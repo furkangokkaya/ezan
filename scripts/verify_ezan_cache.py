@@ -9,13 +9,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from bitlis_services.ezan import is_ezan_cache_complete, today_tr  # noqa: E402
+from bitlis_services.ezan import ezan_posting_date, is_ezan_cache_complete  # noqa: E402
 
 CACHE = ROOT / "bitlis_ezan_cache.json"
 
 
 def main() -> int:
-    today = today_tr()
+    today = ezan_posting_date()
     data = json.loads(CACHE.read_text(encoding="utf-8"))
     print(f"date={data.get('date')} expected={today} total={data.get('total')} source={data.get('source')}")
     if "diyanet" not in str(data.get("source") or "").lower():

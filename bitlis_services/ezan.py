@@ -4,7 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
@@ -37,11 +38,31 @@ KEYS = ("İmsak", "Güneş", "Öğle", "İkindi", "Akşam", "Yatsı")
 _HHMM = re.compile(r"^\d{2}:\d{2}$")
 
 
-def today_tr(now: Optional[datetime] = None) -> str:
+def _istanbul(now: Optional[datetime] = None) -> datetime:
     moment = now or datetime.now(TZ_TR)
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=TZ_TR)
-    return moment.astimezone(TZ_TR).strftime("%Y-%m-%d")
+    return moment.astimezone(TZ_TR)
+
+
+def today_tr(now: Optional[datetime] = None) -> str:
+    return _istanbul(now).strftime("%Y-%m-%d")
+
+
+def ezan_posting_moment(now: Optional[datetime] = None) -> datetime:
+    """22:00 paylaşımı bir sonraki günün vakitleridir.
+
+    Öğleden sonra hedef yarındır. Gece yarısından öğlene kadar hedef bugündür;
+    böylece 22:00 kaçarsa sabah telafisi aynı kartı basar.
+    """
+    moment = _istanbul(now)
+    if moment.hour >= 12:
+        moment = moment + timedelta(days=1)
+    return moment.replace(hour=12, minute=0, second=0, microsecond=0)
+
+
+def ezan_posting_date(now: Optional[datetime] = None) -> str:
+    return ezan_posting_moment(now).strftime("%Y-%m-%d")
 
 
 def is_ezan_cache_complete(data: Optional[Dict[str, Any]]) -> bool:
@@ -104,20 +125,29 @@ def fetch_live(now: Optional[datetime] = None) -> Dict[str, Any]:
     headers = {"User-Agent": "BitlisBilgiBot/1.0", "Accept-Language": "tr-TR"}
     for name, district_id in LOCS:
         url = f"https://namazvakitleri.diyanet.gov.tr/tr-TR/{district_id}"
-        try:
-            response = requests.get(url, headers=headers, timeout=40)
-            response.raise_for_status()
-            clocks = _row_times(response.text, day_prefix)
-            if not clocks or not _times_sane(dict(zip(KEYS, clocks))):
-                raise ValueError(f"{day_prefix} satiri yok veya saat sirasi hatali")
-            places.append({
-                "name": name,
-                "diyanet_id": district_id,
-                "times": {label: clock for label, clock in zip(KEYS, clocks)},
-            })
-        except Exception as exc:
-            last_error = str(exc)
-            logger.warning("Ezan alinamadi (%s): %s", name, exc)
+        placed = False
+        for attempt in range(3):
+            try:
+                response = requests.get(url, headers=headers, timeout=40)
+                response.raise_for_status()
+                clocks = _row_times(response.text, day_prefix)
+                if not clocks or not _times_sane(dict(zip(KEYS, clocks))):
+                    raise ValueError(f"{day_prefix} satiri yok veya saat sirasi hatali")
+                places.append({
+                    "name": name,
+                    "diyanet_id": district_id,
+                    "times": {label: clock for label, clock in zip(KEYS, clocks)},
+                })
+                placed = True
+                break
+            except Exception as exc:
+                last_error = str(exc)
+                if attempt < 2:
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
+                logger.warning("Ezan alinamadi (%s): %s", name, exc)
+        if not placed:
+            continue
     result: Dict[str, Any] = {
         "ok": len(places) == len(LOCS),
         "date": moment.strftime("%Y-%m-%d"),
@@ -162,10 +192,11 @@ def fetch_ezan_times(
     remote_token: str = "",
     github_only: bool = True,
 ) -> Dict[str, Any]:
-    """Bugünün vakitleri. Varsayılan: GitHub raw cache. github_only=False canlı Aladhan."""
-    expected = today_tr()
+    """Paylaşılacak günün vakitleri. 22:00'de ertesi gün. Kaynak: Diyanet."""
+    moment = ezan_posting_moment()
+    expected = moment.strftime("%Y-%m-%d")
     if not github_only:
-        live = fetch_live()
+        live = fetch_live(moment)
         if is_ezan_cache_complete(live) and str(live.get("date") or "") == expected:
             _save_cache(live)
         return live

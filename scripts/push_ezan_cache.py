@@ -22,10 +22,10 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def _cache_ok(data: dict) -> bool:
-    from bitlis_services.ezan import is_ezan_cache_complete, today_tr
+    from bitlis_services.ezan import ezan_posting_date, is_ezan_cache_complete
 
     return (
-        str(data.get("date") or "") == today_tr()
+        str(data.get("date") or "") == ezan_posting_date()
         and "diyanet" in str(data.get("source") or "").lower()
         and is_ezan_cache_complete(data)
     )
@@ -42,7 +42,7 @@ def _remote_ok() -> bool:
 
 
 def main() -> int:
-    from bitlis_services.ezan import today_tr
+    from bitlis_services.ezan import ezan_posting_date
 
     if not CACHE.is_file():
         print("HATA: bitlis_ezan_cache.json yok", file=sys.stderr)
@@ -59,7 +59,7 @@ def main() -> int:
         print("Remote zaten bugunku ezan cache — push atlandi.")
         return 0
 
-    today = today_tr()
+    today = ezan_posting_date()
     _run(["git", "add", "bitlis_ezan_cache.json"])
     if _run(["git", "diff", "--staged", "--quiet"]).returncode == 0:
         print("Staged degisiklik yok.")

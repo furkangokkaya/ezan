@@ -11,11 +11,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from bitlis_services.ezan import is_ezan_cache_complete, today_tr  # noqa: E402
+from bitlis_services.ezan import ezan_posting_date, is_ezan_cache_complete  # noqa: E402
 
 
 def main() -> int:
-    today = today_tr()
+    today = ezan_posting_date()
     ready = False
     r = subprocess.run(
         ["git", "show", "origin/main:bitlis_ezan_cache.json"],

@@ -5,13 +5,12 @@ name: Ezan cache daily
 
 on:
   schedule:
-    # Paylaşım 00:45 TR. 00:20 / 00:35 / 00:45 TR → 21:20 / 21:35 / 21:45 UTC
-    - cron: "20 21 * * *"
-    - cron: "35 21 * * *"
-    - cron: "45 21 * * *"
-    - cron: "0 18 * * *"
-    - cron: "0 20 * * *"
-    - cron: "30 22 * * *"
+    # Paylaşım 22:00 TR (ertesi gün). 21:40 / 21:50 / 22:00 / 22:30 TR → 18:40 / 18:50 / 19:00 / 19:30 UTC
+    - cron: "40 18 * * *"
+    - cron: "50 18 * * *"
+    - cron: "0 19 * * *"
+    - cron: "30 19 * * *"
+    - cron: "0 5 * * *"
   workflow_dispatch:
   push:
     branches: [main]

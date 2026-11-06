@@ -10,18 +10,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from bitlis_services.ezan import fetch_live, is_ezan_cache_complete, today_tr  # noqa: E402
+from bitlis_services.ezan import ezan_posting_moment, fetch_live, is_ezan_cache_complete  # noqa: E402
 
 OUT = ROOT / "bitlis_ezan_cache.json"
 
 
 def main() -> int:
-    today = today_tr()
+    day = ezan_posting_moment()
+    today = day.strftime("%Y-%m-%d")
     print(f"TR tarih: {today}", flush=True)
     data: dict = {}
     last_error = ""
     for attempt in range(1, 4):
-        data = fetch_live()
+        data = fetch_live(day)
         if (
             data.get("ok")
             and str(data.get("date") or "") == today
